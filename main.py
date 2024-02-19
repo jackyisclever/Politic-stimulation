@@ -1,7 +1,7 @@
 import math
 import random
 
-W = 4000
+W = 35
 PublicGoodPrice = 10
 discounting_factor = 0.1
 
@@ -41,6 +41,7 @@ def random_elements(list1, list2, n):     #  Select n element that is in list1 b
   remaining_elements = [elem for elem in list1 if elem not in list2]
 
   if n > len(remaining_elements):
+     print(remaining_elements,n)
      raise ValueError("n should be less than number of remaining elements")
 
   sampled_elements = random.sample(remaining_elements, n)
@@ -141,7 +142,9 @@ class challenger(politic_player):
       all_indices = [i for i in range(len(self.game.selectors))]
       to_add = random_elements(all_indices, winning_coalition, W-1)
       winning_coalition += to_add
+      # winning_coalition = random.sample(range(len(affinities)), W)
       self.winning_coalition = winning_coalition
+     
 
 
 ## MAIN Game
@@ -151,8 +154,11 @@ class Game:
       self.initialized = False
       self.nCitizen = nCitizen
       self.nSelectors = nSelectors
+      self.history = {'leader': 0, 'challenger': 0}
+      self.mute = False
+      self.W = int(nSelectors/2)
 
-    def initialization(self, nCitizen = None, nSelectors = None):
+    def initialize(self, nCitizen = None, nSelectors = None):
       if nCitizen == None:
         nCitizen = self.nCitizen
       if nSelectors == None:
@@ -184,20 +190,24 @@ class Game:
       if leader_count >= W:
         winner = self.Leader
         text = 'Leader'
+        self.history['leader'] += 1
       elif challenger_count >= W:
         winner = self.Challenger
         text = 'Challenger'
+        self.history['challenger'] += 1
       else:
         winner = None
-      print(f'Leader : {leader_count} ; Policy : {self.Leader.policy}')
-      print(f'Challenger : {challenger_count} ; Policy : {self.Challenger.policy}')
-      print(f'Winner : {text}')
+      
+      if self.mute is False:
+        print(f'Leader : {leader_count} ; Policy : {self.Leader.policy}')
+        print(f'Challenger : {challenger_count} ; Policy : {self.Challenger.policy}')
+        print(f'Winner : {text}')
 
       return winner
 
     def play(self):
         if self.initialized == False:
-            self.initialization(self.nCitizen,self.nSelectors)
+            self.initialize(self.nCitizen,self.nSelectors)
 
         self.Leader.select_winning_coalition(W)
         self.Challenger.select_winning_coalition(self.affinities,W)
@@ -215,6 +225,4 @@ class Game:
         for citizen in self.citizens:
             citizen.update_leisure(Leader.policy)
 
-
-game = Game(12000,8000)
-game.play()
+# game = Game(12000, 8000)
