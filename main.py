@@ -1,5 +1,4 @@
 import math
-from scipy.optimize import minimize
 import random
 
 W = 4000
@@ -9,8 +8,8 @@ discounting_factor = 0.1
 ## Strategy
 def Strategy(Leader, citizens):
   tax_rate = random.random()
-  nPublicGood = random_integer = random.randint(0, 10000)
-  nPrivateGood = random_integer = random.randint(0, 10000)
+  nPublicGood = random.randint(0, 10000)
+  nPrivateGood = random.randint(0, 10000)
   policy = (tax_rate,nPublicGood,nPrivateGood)
   return policy
 
@@ -79,7 +78,6 @@ class citizen:
     l = self.compute_leisure(policy)
     self.l = l
 
-
   def select_leader(self):
     if self.is_selector:
       if selector.name in Leader.winning_coalition:
@@ -114,51 +112,50 @@ class politic_player:
       self.nPrivateGood = nPrivateGood
       self.policy = (self.tax_rate, self.nPublicGood, self.nPrivateGood)
 
+class leader(politic_player):
+  def __init__(self,game):
+    super().__init__()
+    self.game = game
 
+  def offer_policy(self):
+    policy = Strategy(self.game.Leader, self.game.citizens)
+    self.update_policy(*policy)
 
+  def select_winning_coalition(self, n):
+      winning_coalition = find_highest_n_affinities(self.game.affinities, n)      # Return a list of index.
+      self.winning_coalition = winning_coalition
+
+class challenger(politic_player): 
+  def __init__(self,game):
+    super().__init__()
+    self.game = game
+
+  def offer_policy(self):
+    policy = Strategy(self.game.Leader, self.game.citizens)
+    self.update_policy(*policy)
+
+  def select_winning_coalition(self, affinities, W):
+      winning_coalition = [random.choice(self.gameLeader.winning_coalition)]
+      all_indices = [i for i in range(len(self.game.selectors))]
+      to_add = random_elements(all_indices, winning_coalition, W-1)
+      winning_coalition += to_add
+      self.winning_coalition = winning_coalition
 
 
 ## MAIN Game
 
 class Game:
     def __init__(self,nCitizen,nSelectors):
-      # self.citizens = []
-      # self.leader = Leader() 
-      # self.challenger = Challenger()
+      pass
+
+    def initialization(self,nCitizen,nSelectors):
       self.citizens = self.Initize_citizen(nCitizen)
       self.selectors = self.As_slector(nSelectors)
-      self.Leader = leader()
-      self.Challenger = challenger()
+      self.Leader = leader(self)
+      self.Challenger = challenger(self)
       self.Voting_box = []
 
-      self.affinities = None
-
-    class leader(politic_player):
-      def __init__(self):
-        super().__init__()
-
-      def offer_policy(self):
-        policy = Strategy(Leader, citizens)
-        self.update_policy(*policy)
-
-      def select_winning_coalition(self, affinities, n):
-          winning_coalition = find_highest_n_affinities(affinities, n)      # Return a list of index.
-          self.winning_coalition = winning_coalition
-
-    class challenger(politic_player): 
-      def __init__(self):
-        super().__init__()
-
-      def offer_policy(self):
-        policy = Strategy(Leader, citizens)
-        self.update_policy(*policy)
-
-      def select_winning_coalition(self, affinities, W):
-          winning_coalition = [random.choice(Leader.winning_coalition)]
-          all_indices = [i for i in range(len(selectors))]
-          to_add = random_elements(all_indices, winning_coalition, W-1)
-          winning_coalition += to_add
-          self.winning_coalition = winning_coalition
+      self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
 
     def Initize_citizen(self, nCitizen):
         citizen_list = [citizen(i) for i in range(nCitizen)]
@@ -187,8 +184,6 @@ class Game:
       return winner
 
     def play(self):
-        self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
-
         self.Leader.select_winning_coalition(self.affinities,W)
         self.Challenger.select_winning_coalition(self.affinities,W)
 
