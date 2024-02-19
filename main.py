@@ -230,10 +230,10 @@ class Game:
           vote = selector.select_leader()
           self.Voting_box.append(vote)
 
-        Leader = self.Announce_new_leader()
+        new_leader = self.Announce_new_leader()
         
         if Leader is not None:
           for citizen in self.citizens:
-              citizen.update_leisure(Leader.policy)
+              citizen.update_leisure(new_leader.policy)
 
 # game = Game(12000, 8000)
