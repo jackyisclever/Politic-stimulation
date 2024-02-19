@@ -5,7 +5,7 @@ PublicGoodPrice = 10
 discounting_factor = 0.1
 
 ## Strategy
-def Strategy(Leader, citizens):
+def Random_Strategy(Leader, citizens):
   tax_rate = random.random()
   nPublicGood = random.randint(0, 10000)
   nPrivateGood = random.randint(0, 10000)
@@ -116,12 +116,13 @@ class politic_player:
       self.policy = (self.tax_rate, self.nPublicGood, self.nPrivateGood)
 
 class leader(politic_player):
-  def __init__(self,game):
+  def __init__(self,game, leader_strategy = Random_Strategy):
     super().__init__()
     self.game = game
+    self.policy_strategy = leader_strategy
 
   def offer_policy(self):
-    policy = Strategy(self.game.Leader, self.game.citizens)
+    policy = self.policy_strategy(self.game.Leader, self.game.citizens)
     self.update_policy(*policy)
 
   def select_winning_coalition(self):
@@ -129,12 +130,13 @@ class leader(politic_player):
       self.winning_coalition = winning_coalition
 
 class challenger(politic_player): 
-  def __init__(self,game):
+  def __init__(self,game, challenger_strategy = Random_Strategy):
     super().__init__()
     self.game = game
+    self.policy_strategy = challenger_strategy
 
   def offer_policy(self):
-    policy = Strategy(self.game.Leader, self.game.citizens)
+    policy = self.policy_strategy(self.game.Leader, self.game.citizens)
     self.update_policy(*policy)
 
   def select_winning_coalition(self):
@@ -152,13 +154,16 @@ class challenger(politic_player):
 ## MAIN Game
 
 class Game:
-    def __init__(self, nCitizen, nSelectors, W):
+    def __init__(self, nCitizen, nSelectors, W, leader_strategy = Random_Strategy, challenger_strategy = Random_Strategy):
       self.initialized = False
       self.nCitizen = nCitizen
       self.nSelectors = nSelectors
       self.history = {'leader': 0, 'challenger': 0, 'no_winner': 0}
       self.mute = False
       self.W = W 
+
+      self.leader_strategy = leader_strategy
+      self.challenger_strategy = challenger_strategy
 
     def initialize(self, nCitizen = None, nSelectors = None):
       if nCitizen == None:
@@ -168,8 +173,8 @@ class Game:
 
       self.citizens = self.Initize_citizen(nCitizen)
       self.selectors = self.As_slector(nSelectors)
-      self.Leader = leader(self)
-      self.Challenger = challenger(self)
+      self.Leader = leader(self, self.leader_strategy)
+      self.Challenger = challenger(self, self.challenger_strategy)
       self.Voting_box = []
 
       self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
@@ -215,25 +220,25 @@ class Game:
         selector.affinity_to_current_leader = random.random()
       self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
 
-    def play(self):
+    def play(self, nTimes = 1):
         if self.initialized == False:
             self.initialize(self.nCitizen,self.nSelectors)
+        for i in range(nTimes):
+          self.Leader.select_winning_coalition()
+          self.Challenger.select_winning_coalition()
 
-        self.Leader.select_winning_coalition()
-        self.Challenger.select_winning_coalition()
+          self.Leader.offer_policy()
+          self.Challenger.offer_policy()
 
-        self.Leader.offer_policy()
-        self.Challenger.offer_policy()
+          self.Voting_box = []
+          for selector in self.selectors:
+            vote = selector.select_leader()
+            self.Voting_box.append(vote)
 
-        self.Voting_box = []
-        for selector in self.selectors:
-          vote = selector.select_leader()
-          self.Voting_box.append(vote)
-
-        new_leader = self.Announce_new_leader()
-        
-        if new_leader is not None:
-          for citizen in self.citizens:
-              citizen.update_leisure(new_leader.policy)
+          new_leader = self.Announce_new_leader()
+          
+          if new_leader is not None:
+            for citizen in self.citizens:
+                citizen.update_leisure(new_leader.policy)
 
 # game = Game(12000, 8000)
