@@ -232,7 +232,7 @@ class Game:
 
         new_leader = self.Announce_new_leader()
         
-        if Leader is not None:
+        if new_leader is not None:
           for citizen in self.citizens:
               citizen.update_leisure(new_leader.policy)
 
