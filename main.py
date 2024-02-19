@@ -57,12 +57,14 @@ def generate_with_probability(p):
 ## Agents
 
 class citizen:
-  def __init__(self, name):
+  def __init__(self, name, game):
       self.name = name
       self.l = random.random()
       self.is_selector = False
-      self.vote = 'leader' if self.is_selector else None
+      self.vote = None
       self.affinity_to_current_leader = random.random() if self.is_selector else None
+
+      self.game = game
   
   # r = tax_rate, x = nPublicGood, g = nPrivateGood
   def payoff(self,r,x,g,l,factor):      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
@@ -80,16 +82,16 @@ class citizen:
 
   def select_leader(self):
     if self.is_selector:
-      if selector.name in Leader.winning_coalition:
-        Leader_payoff = self.payoff(*Leader.policy, self.compute_leisure(Leader.policy), 1)
+      if self.name in self.game.Leader.winning_coalition:
+        Leader_payoff = self.payoff(*self.game.Leader.policy, self.compute_leisure(self.game.Leader.policy), 1)
       else: 
-        Leader_payoff = self.payoff(*Leader.policy, self.compute_leisure(Leader.policy), 0)
+        Leader_payoff = self.payoff(*self.game.Leader.policy, self.compute_leisure(self.game.Leader.policy), 0)
 
-      Challenger_payoff = self.payoff(*Challenger.policy, self.compute_leisure(Challenger.policy) , generate_with_probability(W/len(selectors)))
+      Challenger_payoff = self.payoff(*self.game.Challenger.policy, self.compute_leisure(self.game.Challenger.policy) , generate_with_probability(W/len(self.game.selectors)))
 
       if Leader_payoff >= Challenger_payoff:
         vote = 'leader'
-  # elif self.payoff(*Leader_policy) == self.payoff(*Challenger_policy) and M == challenger.tax_rate*E:  # to fix
+  # elif self.payoff(*self.game.Leader_policy) == self.payoff(*self.game.Challenger_policy) and M == self.game.challenger.tax_rate*E:  # to fix
   #   vote = 'leader'
       else:
         vote = 'challenger'
@@ -135,7 +137,7 @@ class challenger(politic_player):
     self.update_policy(*policy)
 
   def select_winning_coalition(self, affinities, W):
-      winning_coalition = [random.choice(self.gameLeader.winning_coalition)]
+      winning_coalition = [random.choice(self.game.Leader.winning_coalition)]
       all_indices = [i for i in range(len(self.game.selectors))]
       to_add = random_elements(all_indices, winning_coalition, W-1)
       winning_coalition += to_add
@@ -145,10 +147,17 @@ class challenger(politic_player):
 ## MAIN Game
 
 class Game:
-    def __init__(self,nCitizen,nSelectors):
-      pass
+    def __init__(self, nCitizen, nSelectors):
+      self.initialized = False
+      self.nCitizen = nCitizen
+      self.nSelectors = nSelectors
 
-    def initialization(self,nCitizen,nSelectors):
+    def initialization(self, nCitizen = None, nSelectors = None):
+      if nCitizen == None:
+        nCitizen = self.nCitizen
+      if nSelectors == None:
+        nSelectors = self.nSelectors
+
       self.citizens = self.Initize_citizen(nCitizen)
       self.selectors = self.As_slector(nSelectors)
       self.Leader = leader(self)
@@ -156,15 +165,18 @@ class Game:
       self.Voting_box = []
 
       self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
+      self.initialized = True
 
     def Initize_citizen(self, nCitizen):
-        citizen_list = [citizen(i) for i in range(nCitizen)]
+        citizen_list = [citizen(i,self) for i in range(nCitizen)]
         return citizen_list
 
     def As_slector(self, nSelectors):
-      selectors = random.sample(self.itizens, nSelectors)  
+      selectors = random.sample(self.citizens, nSelectors)  
       for selector in selectors:
         selector.is_selector = True
+        selector.affinity_to_current_leader = random.random()
+      return selectors
 
     def Announce_new_leader(self):
       leader_count = self.Voting_box.count('leader')
@@ -177,26 +189,32 @@ class Game:
         text = 'Challenger'
       else:
         winner = None
-      print(f'Leader : {leader_count}')
-      print(f'Challenger : {challenger_count}')
+      print(f'Leader : {leader_count} ; Policy : {self.Leader.policy}')
+      print(f'Challenger : {challenger_count} ; Policy : {self.Challenger.policy}')
       print(f'Winner : {text}')
 
       return winner
 
     def play(self):
-        self.Leader.select_winning_coalition(self.affinities,W)
+        if self.initialized == False:
+            self.initialization(self.nCitizen,self.nSelectors)
+
+        self.Leader.select_winning_coalition(W)
         self.Challenger.select_winning_coalition(self.affinities,W)
 
         self.Leader.offer_policy()
-        self.Leader.Challenger.offer_policy()
+        self.Challenger.offer_policy()
 
         self.Voting_box = []
         for selector in self.selectors:
           vote = selector.select_leader()
           self.Voting_box.append(vote)
 
-        Leader = self.Announce_new_leader(self.Voting_box)
+        Leader = self.Announce_new_leader()
 
         for citizen in self.citizens:
             citizen.update_leisure(Leader.policy)
 
+
+game = Game(12000,8000)
+game.play()
