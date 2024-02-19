@@ -1,7 +1,6 @@
 import math
 import random
 
-W = 35
 PublicGoodPrice = 10
 discounting_factor = 0.1
 
@@ -41,8 +40,9 @@ def random_elements(list1, list2, n):     #  Select n element that is in list1 b
   remaining_elements = [elem for elem in list1 if elem not in list2]
 
   if n > len(remaining_elements):
-     print(remaining_elements,n)
-     raise ValueError("n should be less than number of remaining elements")
+    #  print(remaining_elements,n)
+    #  raise ValueError("n should be less than number of remaining elements")
+     return remaining_elements        ### Warning, ERROR MAY POSSIBLE !!!
 
   sampled_elements = random.sample(remaining_elements, n)
 
@@ -88,7 +88,7 @@ class citizen:
       else: 
         Leader_payoff = self.payoff(*self.game.Leader.policy, self.compute_leisure(self.game.Leader.policy), 0)
 
-      Challenger_payoff = self.payoff(*self.game.Challenger.policy, self.compute_leisure(self.game.Challenger.policy) , generate_with_probability(W/len(self.game.selectors)))
+      Challenger_payoff = self.payoff(*self.game.Challenger.policy, self.compute_leisure(self.game.Challenger.policy) , generate_with_probability(self.game.W/len(self.game.selectors)))
 
       if Leader_payoff >= Challenger_payoff:
         vote = 'leader'
@@ -124,8 +124,8 @@ class leader(politic_player):
     policy = Strategy(self.game.Leader, self.game.citizens)
     self.update_policy(*policy)
 
-  def select_winning_coalition(self, n):
-      winning_coalition = find_highest_n_affinities(self.game.affinities, n)      # Return a list of index.
+  def select_winning_coalition(self):
+      winning_coalition = find_highest_n_affinities(self.game.affinities, self.game.W)      # Return a list of index.
       self.winning_coalition = winning_coalition
 
 class challenger(politic_player): 
@@ -137,10 +137,12 @@ class challenger(politic_player):
     policy = Strategy(self.game.Leader, self.game.citizens)
     self.update_policy(*policy)
 
-  def select_winning_coalition(self, affinities, W):
+  def select_winning_coalition(self):
       winning_coalition = [random.choice(self.game.Leader.winning_coalition)]
       all_indices = [i for i in range(len(self.game.selectors))]
-      to_add = random_elements(all_indices, winning_coalition, W-1)
+      to_add = random_elements(all_indices, winning_coalition, self.game.W-1)
+      if len(to_add) != self.game.W-1:    # When no sufficient elemt from 'all_indices - winning_coalition'
+         to_add += random_elements(self.game.Leader.winning_coalition, winning_coalition, self.game.W-1-len(to_add))
       winning_coalition += to_add
       # winning_coalition = random.sample(range(len(affinities)), W)
       self.winning_coalition = winning_coalition
@@ -150,13 +152,13 @@ class challenger(politic_player):
 ## MAIN Game
 
 class Game:
-    def __init__(self, nCitizen, nSelectors):
+    def __init__(self, nCitizen, nSelectors, W):
       self.initialized = False
       self.nCitizen = nCitizen
       self.nSelectors = nSelectors
-      self.history = {'leader': 0, 'challenger': 0}
+      self.history = {'leader': 0, 'challenger': 0, 'no_winner': 0}
       self.mute = False
-      self.W = int(nSelectors/2)
+      self.W = W 
 
     def initialize(self, nCitizen = None, nSelectors = None):
       if nCitizen == None:
@@ -187,16 +189,19 @@ class Game:
     def Announce_new_leader(self):
       leader_count = self.Voting_box.count('leader')
       challenger_count = self.Voting_box.count('challenger')
-      if leader_count >= W:
+      if leader_count >= self.W:
         winner = self.Leader
         text = 'Leader'
         self.history['leader'] += 1
-      elif challenger_count >= W:
+      elif challenger_count >= self.W:
         winner = self.Challenger
         text = 'Challenger'
         self.history['challenger'] += 1
+        self.update_affinities
       else:
         winner = None
+        text = 'No winner'
+        self.history['no_winner'] += 1
       
       if self.mute is False:
         print(f'Leader : {leader_count} ; Policy : {self.Leader.policy}')
@@ -205,12 +210,17 @@ class Game:
 
       return winner
 
+    def update_affinities(self):
+      for selector in self.selectors:
+        selector.affinity_to_current_leader = random.random()
+      self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
+
     def play(self):
         if self.initialized == False:
             self.initialize(self.nCitizen,self.nSelectors)
 
-        self.Leader.select_winning_coalition(W)
-        self.Challenger.select_winning_coalition(self.affinities,W)
+        self.Leader.select_winning_coalition()
+        self.Challenger.select_winning_coalition()
 
         self.Leader.offer_policy()
         self.Challenger.offer_policy()
@@ -221,8 +231,9 @@ class Game:
           self.Voting_box.append(vote)
 
         Leader = self.Announce_new_leader()
-
-        for citizen in self.citizens:
-            citizen.update_leisure(Leader.policy)
+        
+        if Leader is not None:
+          for citizen in self.citizens:
+              citizen.update_leisure(Leader.policy)
 
 # game = Game(12000, 8000)
