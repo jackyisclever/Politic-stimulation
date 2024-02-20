@@ -124,13 +124,13 @@ class Policy:
       # value = V(x,g,y,l) + self.game.discounting_factor * Z(x,g,y,l)
     ####################################################################################################
    
-    # if self.isFeasible():
-    #   value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
-    # else:
-    #   v0 = 0
-    #   value = v0 + (delta / (1- delta)) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    if self.isFeasible():
+      value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    else:
+      v0 = 0
+      value = v0 + (delta / (1- delta)) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
   
-    value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    # value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
     return value
 
   def show(self):
