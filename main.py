@@ -2,6 +2,14 @@ import math
 import random
 import copy
 
+"""
+#######################
+Understanding:
+1. winning a little and winning a lot are both winning.
+2. Summing the society welfare is not the same is different from summing the vote.
+#######################
+"""
+
 ## Tools
 
 def find_highest_n_affinities(input_list, n):
@@ -42,7 +50,6 @@ def generate_with_probability(p):
         return 1
     else:
         return 0
-
 
 ## Key Objects
 
@@ -95,7 +102,10 @@ class Policy:
 
     # Check if the policy is Propose by Leader
     if self.owner.isLeader:
-      factor = 1 if citizen.name in self.PrivateGood_agent_names else 0             # Check if recieve the PrivateGood; indicator factor = 0 or 1
+      try:
+        factor = 1 if citizen.name in self.PrivateGood_agent_names else 0             # Check if recieve the PrivateGood; indicator factor = 0 or 1
+      except:
+        factor = 1 if citizen in self.PrivateGood_agent_names else 0             # This case is for inputing a integer as citizen instead of using a citizen object
     else:   # When Proposed by Challenger
       factor = self.game.W/self.game.nSelectors      # Simplified, in view of the V is Linear
 
@@ -114,12 +124,13 @@ class Policy:
       # value = V(x,g,y,l) + self.game.discounting_factor * Z(x,g,y,l)
     ####################################################################################################
    
-    if self.isFeasible():
-      value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
-    else:
-      v0 = 0
-      value = v0 + (delta / (1- delta)) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    # if self.isFeasible():
+    #   value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    # else:
+    #   v0 = 0
+    #   value = v0 + (delta / (1- delta)) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
   
+    value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
     return value
 
   def show(self):
@@ -141,7 +152,6 @@ def Random_Strategy(Leader, citizens):
   tax_rate = random.random()
   nPublicGood = random.randint(0, 10000)
   nPrivateGood = random.randint(0, 10000)
-
   output = (tax_rate,nPublicGood,nPrivateGood)
   return output
 
@@ -256,20 +266,19 @@ class The_Public():
     self.game = game
   
   def payoff(self,policy):     
-    r = policy.tax_rate
-    x = policy.nPublicGood
-    g = policy.nPrivateGood
+    PG_selectors = [name for name in self.selector_names if name in policy.PrivateGood_agent_names]
+    non_PG_selectors = [name for name in self.selector_names if name not in policy.PrivateGood_agent_names]
 
-    if policy.owner.isLeader:     # Can directly do here in view of the linearity of the payoff function
-      PG_selector = [name for name in self.selector_names if name in policy.PrivateGood_agent_names]
-      factor = len(PG_selector)/len(self.game.selector_names)      
-    else:
-      factor = self.game.W/self.game.nSelectors
+    PG_selector = random.choice(PG_selectors)
+    non_PG_selector = random.choice(non_PG_selectors)
+    n1 = len(PG_selectors)
+    n2 = len(non_PG_selectors)
 
-    l = self.compute_leisure(policy)
-    y = (1-r) * (1-l)
+    PG_value = policy.payoff(PG_selector) * n1
+    non_PG_value = policy.payoff(non_PG_selector) * n2
 
-    value = math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l)
+    value = (PG_value + non_PG_value) / (n1 + n2)       # (n1 + n2) is constant, hence in fact not quite matter if divide or not
+    
     return value
 
   def compute_leisure(self, policy):
