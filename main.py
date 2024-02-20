@@ -87,13 +87,13 @@ class Policy:
     r = self.tax_rate
     x = self.nPublicGood
     g = self.nPrivateGood
-    l = self.compute_leisure(self)
+    l = self.compute_leisure()
     y = (1-r) * (1-l)
 
     delta = self.game.discounting_factor
 
     # Check if the policy is Propose by Leader
-    if self.isLeader:
+    if self.owner.isLeader:
       factor = 1 if citizen.name in self.PrivateGood_agent_names else 0             # Check if recieve the PrivateGood; indicator factor = 0 or 1
     else:   # When Proposed by Challenger
       factor = self.game.W/self.game.nSelectors      # Simplified, in view of the V is Linear
