@@ -1,18 +1,6 @@
 import math
 import random
 
-PublicGoodPrice = 10
-discounting_factor = 0.1
-
-## Strategy
-def Random_Strategy(Leader, citizens):
-  tax_rate = random.random()
-  nPublicGood = random.randint(0, 10000)
-  nPrivateGood = random.randint(0, 10000)
-  policy = (tax_rate,nPublicGood,nPrivateGood)
-  return policy
-
-
 ## Tools
 
 def find_highest_n_affinities(input_list, n):
@@ -55,26 +43,79 @@ def generate_with_probability(p):
         return 0
 
 
-## Agents
+## Key Objects
 
+class Policy:
+  def __init__(self, owner, tax_rate = None, nPublicGood = None, nPrivateGood = None, PrivateGood_agent_names = None):
+    # Content
+    self.tax_rate = tax_rate             # float in [0,1], r
+    self.nPublicGood = nPublicGood       # Int, x
+    self.nPrivateGood = nPrivateGood     # Int, g
+    self.PrivateGood_agent_names = PrivateGood_agent_names    # List of index of citizens
+
+  # Binding
+    self.owner = owner
+
+  def update(self, tax_rate, nPublicGood, nPrivateGood, PrivateGood_agent_names = None):
+    self.tax_rate = tax_rate
+    self.nPublicGood = nPublicGood
+    self.nPrivateGood = nPrivateGood
+
+    if PrivateGood_agent_names is not None:
+      self.PrivateGood_agent_names = PrivateGood_agent_names
+
+  def make_sense(self):
+      if self.tax_rate is None or self.nPublicGood is None or self.nPrivateGood is None:
+          return False
+      elif self.tax_rate < 0 or self.tax_rate > 1 or self.nPublicGood < 0 or self.nPrivateGood < 0:
+          return False
+      else:
+          return True
+    
+  def show(self):
+    # return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.PrivateGood_agent_names
+    return (self.tax_rate, self.nPublicGood, self.nPrivateGood)
+
+## Strategy
+def Random_Strategy(Leader, citizens):
+  tax_rate = random.random()
+  nPublicGood = random.randint(0, 10000)
+  nPrivateGood = random.randint(0, 10000)
+
+  output = (tax_rate,nPublicGood,nPrivateGood)
+  return output
+
+
+## Agents
 class citizen:
   def __init__(self, name, game):
-      self.name = name
+    # Neccessary property
+      self.name = name    # The index while created
       self.l = random.random()
       self.is_selector = False
+
+      # only for selector
       self.vote = None
       self.affinity_to_current_leader = random.random() if self.is_selector else None
 
+      # Game binding
       self.game = game
   
-  # r = tax_rate, x = nPublicGood, g = nPrivateGood
-  def payoff(self,r,x,g,l,factor):      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
-    y = (1-r)*(1-l)
+  def payoff(self,policy):     
+
+    r = policy.tax_rate
+    x = policy.nPublicGood
+    g = policy.nPrivateGood
+
+    factor = 1 if self.name in policy.PrivateGood_agent_names else 0      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
+    l = self.compute_leisure(policy)
+    y = (1-r) * (1-l)
+
     value = math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l)
     return value
 
   def compute_leisure(self, policy):
-    l = 1/(2-policy[0])
+    l = 1/(2-policy.tax_rate)
     return l
 
   def update_leisure(self,policy):
@@ -83,16 +124,12 @@ class citizen:
 
   def select_leader(self):
     if self.is_selector:
-      if self.name in self.game.Leader.winning_coalition:
-        Leader_payoff = self.payoff(*self.game.Leader.policy, self.compute_leisure(self.game.Leader.policy), 1)
-      else: 
-        Leader_payoff = self.payoff(*self.game.Leader.policy, self.compute_leisure(self.game.Leader.policy), 0)
-
-      Challenger_payoff = self.payoff(*self.game.Challenger.policy, self.compute_leisure(self.game.Challenger.policy) , generate_with_probability(self.game.W/len(self.game.selectors)))
+      Leader_payoff = self.payoff(self.game.Leader.policy)
+      Challenger_payoff = self.payoff(self.game.Challenger.policy)
 
       if Leader_payoff >= Challenger_payoff:
         vote = 'leader'
-  # elif self.payoff(*self.game.Leader_policy) == self.payoff(*self.game.Challenger_policy) and M == self.game.challenger.tax_rate*E:  # to fix
+  # elif self.payoff(self.game.Leader_policy) == self.payoff(self.game.Challenger_policy) and M == self.game.challenger.tax_rate*E:  # to fix
   #   vote = 'leader'
       else:
         vote = 'challenger'
@@ -101,44 +138,34 @@ class citizen:
     else:
        print('Unexpected, the current agent could not vote')
 
-class politic_player:
-    def __init__(self):
-        self.winning_coalition = None       # Index list
-        self.tax_rate = None                # float in [0,1], r
-        self.nPublicGood = None             # Int, x
-        self.nPrivateGood = None            # Int, g
-        self.policy = (self.tax_rate,self.nPublicGood,self.nPrivateGood)
-
-    def update_policy(self, tax_rate, nPublicGood, nPrivateGood):
-      self.tax_rate = tax_rate
-      self.nPublicGood = nPublicGood 
-      self.nPrivateGood = nPrivateGood
-      self.policy = (self.tax_rate, self.nPublicGood, self.nPrivateGood)
-
-class leader(politic_player):
+class leader():
   def __init__(self,game, leader_strategy = Random_Strategy):
-    super().__init__()
     self.game = game
+    self.policy = Policy(self)
     self.policy_strategy = leader_strategy
 
   def offer_policy(self):
-    policy = self.policy_strategy(self.game.Leader, self.game.citizens)
-    self.update_policy(*policy)
+    output = self.policy_strategy(self.game.Leader, self.game.citizens)        # output is in tuple form
+    self.policy.update(*output)
 
   def select_winning_coalition(self):
       winning_coalition = find_highest_n_affinities(self.game.affinities, self.game.W)      # Return a list of index.
       self.winning_coalition = winning_coalition
+      self.policy.PrivateGood_agent_names = self.winning_coalition
 
-class challenger(politic_player): 
+class challenger(): 
   def __init__(self,game, challenger_strategy = Random_Strategy):
-    super().__init__()
+    self.winning_coalition = None
+    self.policy = Policy(self)
     self.game = game
     self.policy_strategy = challenger_strategy
 
   def offer_policy(self):
-    policy = self.policy_strategy(self.game.Leader, self.game.citizens)
-    self.update_policy(*policy)
-
+    output = self.policy_strategy(self.game.Leader, self.game.citizens)        # output is in tuple form
+    self.winning_coalition = None
+    self.policy = Policy()
+    self.policy.update(*output)
+    
   def select_winning_coalition(self):
       winning_coalition = [random.choice(self.game.Leader.winning_coalition)]
       all_indices = [i for i in range(len(self.game.selectors))]
@@ -148,22 +175,32 @@ class challenger(politic_player):
       winning_coalition += to_add
       # winning_coalition = random.sample(range(len(affinities)), W)
       self.winning_coalition = winning_coalition
+      self.policy.PrivateGood_agent_names = self.winning_coalition
      
+
 
 
 ## MAIN Game
 
 class Game:
     def __init__(self, nCitizen, nSelectors, W, leader_strategy = Random_Strategy, challenger_strategy = Random_Strategy):
-      self.initialized = False
-      self.nCitizen = nCitizen
-      self.nSelectors = nSelectors
-      self.history = {'leader': 0, 'challenger': 0, 'no_winner': 0}
-      self.mute = False
-      self.W = W 
-
+      # input Temp.
       self.leader_strategy = leader_strategy
       self.challenger_strategy = challenger_strategy
+      self.nCitizen = nCitizen
+      self.nSelectors = nSelectors
+
+      # Settings
+      self.mute = False
+
+      # Superparameter
+      self.W = W 
+      self.PublicGoodPrice = 10
+      self.discounting_factor = 0.1
+
+      # Game data
+      self.initialized = False
+      self.history = {'leader': 0, 'challenger': 0, 'no_winner': 0}
 
     def initialize(self, nCitizen = None, nSelectors = None):
       if nCitizen == None:
