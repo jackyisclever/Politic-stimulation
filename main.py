@@ -107,7 +107,11 @@ class citizen:
     x = policy.nPublicGood
     g = policy.nPrivateGood
 
-    factor = 1 if self.name in policy.PrivateGood_agent_names else 0      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
+    if policy.owner.isLeader:
+      factor = 1 if self.name in policy.PrivateGood_agent_names else 0      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
+    else:
+      p = self.game.W/self.game.nSelectors
+      factor = generate_with_probability(p)
     l = self.compute_leisure(policy)
     y = (1-r) * (1-l)
 
@@ -144,26 +148,35 @@ class leader():
     self.policy = Policy(self)
     self.policy_strategy = leader_strategy
 
+    # Adiitional
+    self.isLeader = True
+
+    # Data
+    self.winning_coalition = None
+
   def offer_policy(self):
     output = self.policy_strategy(self.game.Leader, self.game.citizens)        # output is in tuple form
     self.policy.update(*output)
 
   def select_winning_coalition(self):
-      winning_coalition = find_highest_n_affinities(self.game.affinities, self.game.W)      # Return a list of index.
+      winning_coalition = find_highest_n_affinities(self.game.affinities, self.game.W)     # Return a list of index.
       self.winning_coalition = winning_coalition
       self.policy.PrivateGood_agent_names = self.winning_coalition
 
 class challenger(): 
   def __init__(self,game, challenger_strategy = Random_Strategy):
-    self.winning_coalition = None
-    self.policy = Policy(self)
     self.game = game
+    self.policy = Policy(self)
     self.policy_strategy = challenger_strategy
+
+    # Adiitional
+    self.isLeader = False
+
+    # Data
+    self.winning_coalition = None
 
   def offer_policy(self):
     output = self.policy_strategy(self.game.Leader, self.game.citizens)        # output is in tuple form
-    self.winning_coalition = None
-    self.policy = Policy()
     self.policy.update(*output)
     
   def select_winning_coalition(self):
@@ -176,14 +189,71 @@ class challenger():
       # winning_coalition = random.sample(range(len(affinities)), W)
       self.winning_coalition = winning_coalition
       self.policy.PrivateGood_agent_names = self.winning_coalition
-     
 
+class The_Public():
+  def __init__(self, nCitizen, nSelector, game):
+  # Neccessary property
+    self.nCitizen = nCitizen
+    self.nSelector = nSelector
+    self.l = random.random()
+
+    # only for selector
+    self.vote = None
+    # self.affinity_to_current_leader = random.random() if self.is_selector else None
+
+    # Game binding
+    self.game = game
+  
+  def payoff(self,policy):     
+    r = policy.tax_rate
+    x = policy.nPublicGood
+    g = policy.nPrivateGood
+
+    if policy.owner.isLeader:     # Can directly do here in view of the linearity of the payoff function
+      PG_selector = [name for name in self.game.selectors if name in policy.PrivateGood_agent_names]
+      factor = len(PG_selector)/len(self.game.selectors)      
+    else:
+      factor = self.game.W/self.game.nSelectors
+
+    l = self.compute_leisure(policy)
+    y = (1-r) * (1-l)
+
+    value = math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l)
+    return value
+
+  def compute_leisure(self, policy):
+    l = 1/(2-policy.tax_rate)
+    return l
+
+  def update_leisure(self,policy):
+    l = self.compute_leisure(policy)
+    self.l = l
+
+  def select_leader(self):
+    Challenger_payoff = self.payoff(self.game.Challenger.policy)
+    Leader_payoff = self.payoff(self.game.Leader.policy)
+
+    if Leader_payoff >= Challenger_payoff:
+      vote = 'leader'
+  # elif self.payoff(self.game.Leader_policy) == self.payoff(self.game.Challenger_policy) and M == self.game.challenger.tax_rate*E:  # to fix
+  #   vote = 'leader'
+    else:
+      vote = 'challenger'
+    self.vote = vote
+    return vote
+
+  def __iter__(self):
+     return self
+  
+  def __next__(self):
+     raise StopIteration
+     
 
 
 ## MAIN Game
 
 class Game:
-    def __init__(self, nCitizen, nSelectors, W, leader_strategy = Random_Strategy, challenger_strategy = Random_Strategy):
+    def __init__(self, nCitizen, nSelectors, W, leader_strategy = Random_Strategy, challenger_strategy = Random_Strategy, quick = False):
       # input Temp.
       self.leader_strategy = leader_strategy
       self.challenger_strategy = challenger_strategy
@@ -192,6 +262,7 @@ class Game:
 
       # Settings
       self.mute = False
+      self.quick = quick
 
       # Superparameter
       self.W = W 
@@ -214,28 +285,36 @@ class Game:
       self.Challenger = challenger(self, self.challenger_strategy)
       self.Voting_box = []
 
-      self.affinities = [selector.affinity_to_current_leader for selector in self.selectors]
+      self.affinities = [selector.affinity_to_current_leader for selector in self.selectors] if self.quick is False else None
       self.initialized = True
 
     def Initize_citizen(self, nCitizen):
-        citizen_list = [citizen(i,self) for i in range(nCitizen)]
-        return citizen_list
+        if self.quick is False:
+          citizen_list = [citizen(i,self) for i in range(nCitizen)]
+          return citizen_list
+        else:
+           object = The_Public(self.nCitizen, self.nSelectors, self)
+           return object
 
     def As_slector(self, nSelectors):
-      selectors = random.sample(self.citizens, nSelectors)  
-      for selector in selectors:
-        selector.is_selector = True
-        selector.affinity_to_current_leader = random.random()
-      return selectors
+      if self.quick is False:
+        selectors = random.sample(self.citizens, nSelectors)  
+        for selector in selectors:
+          selector.is_selector = True
+          selector.affinity_to_current_leader = random.random()
+        return selectors
+      else:
+         return self.citizens   # Selector and citizen would become one object when use The_Public object
 
     def Announce_new_leader(self):
       leader_count = self.Voting_box.count('leader')
       challenger_count = self.Voting_box.count('challenger')
-      if leader_count >= self.W:
+
+      if leader_count > challenger_count and leader_count >= self.W  :
         winner = self.Leader
         text = 'Leader'
         self.history['leader'] += 1
-      elif challenger_count >= self.W:
+      elif challenger_count > self.W and challenger_count != leader_count:
         winner = self.Challenger
         text = 'Challenger'
         self.history['challenger'] += 1
@@ -261,8 +340,9 @@ class Game:
         if self.initialized == False:
             self.initialize(self.nCitizen,self.nSelectors)
         for i in range(nTimes):
-          self.Leader.select_winning_coalition()
-          self.Challenger.select_winning_coalition()
+          if self.quick is False:   # Not applicable when quick mode
+            self.Leader.select_winning_coalition()
+            self.Challenger.select_winning_coalition()
 
           self.Leader.offer_policy()
           self.Challenger.offer_policy()
@@ -272,10 +352,12 @@ class Game:
             vote = selector.select_leader()
             self.Voting_box.append(vote)
 
+          print(self.Voting_box)
           new_leader = self.Announce_new_leader()
           
           if new_leader is not None:
             for citizen in self.citizens:
                 citizen.update_leisure(new_leader.policy)
+
 
 # game = Game(12000, 8000)
