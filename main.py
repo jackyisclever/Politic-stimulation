@@ -1,5 +1,6 @@
 import math
 import random
+import copy
 
 ## Tools
 
@@ -121,10 +122,19 @@ class Policy:
   
     return value
 
-
   def show(self):
     # return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.PrivateGood_agent_names
-    return (self.tax_rate, self.nPublicGood, self.nPrivateGood)
+    return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.payoff(self.game.citizens[0]))
+
+  def copy(self):
+    return copy.deepcopy()
+
+  # def toDict(self, all = False):
+  #   if all:
+  #     return {'tax_rate': self.tax_rate, 'nPublicGood': self.nPublicGood, 'nPrivateGood': self.nPrivateGood, 'PrivateGood_agent_names': self.PrivateGood_agent_names}
+  #   else:
+  #     return {'tax_rate': self.tax_rate, 'nPublicGood': self.nPublicGood, 'nPrivateGood': self.nPrivateGood}
+
 
 ## Strategy
 def Random_Strategy(Leader, citizens):
@@ -309,6 +319,7 @@ class Game:
       # Settings
       self.mute = False
       self.quick = quick
+      self.record_policy = False
 
       # Superparameter
       self.W = W 
@@ -318,6 +329,7 @@ class Game:
       # Game data
       self.initialized = False
       self.history = {'leader': 0, 'challenger': 0, 'no_winner': 0}
+      self.policy_history = {'leader policy': [], 'challenger policy': []} if self.record_policy else 'self.record_policy is now False.'
 
     def initialize(self, nCitizen = None, nSelectors = None):
       if nCitizen == None:
@@ -356,6 +368,8 @@ class Game:
          return self.citizens   # Selector and citizen would become one object when use The_Public object
 
     def Announce_new_leader(self):
+      ### Record and announce winner
+
       leader_count = self.Voting_box.count('leader')
       challenger_count = self.Voting_box.count('challenger')
 
@@ -378,9 +392,17 @@ class Game:
         print(f'Challenger : {challenger_count} ; Policy : {self.Challenger.policy.show()}')
         print(f'Winner : {text}')
 
+    ### Record Policy
+      if self.record_policy:
+        leader_policy = self.Leader.policy.show()
+        challenger_policy = self.Challenger.policy.show()
+        self.policy_history['leader policy'].append(leader_policy)
+        self.policy_history['challenger policy'].append(challenger_policy)
+
       return winner
 
     def Announce_new_leader_quick(self):
+      ### Record and announce winner
       leader_count = self.Voting_box.count('leader')
       # challenger_count = self.Voting_box.count('challenger')
 
@@ -398,6 +420,13 @@ class Game:
         print(f'Leader payoff : {self.citizens.payoff(self.Leader.policy)} ; Policy : {self.Leader.policy.show()}')
         print(f'Challenger payoff : {self.citizens.payoff(self.Challenger.policy)} ; Policy : {self.Challenger.policy.show()}')
         print(f'Winner : {text}')
+
+    ### Record Policy
+      if self.record_policy:
+        leader_policy = self.Leader.policy.show()
+        challenger_policy = self.Challenger.policy.show()
+        self.policy_history['leader policy'].append(leader_policy)
+        self.policy_history['challenger policy'].append(challenger_policy)
 
       return winner
 
