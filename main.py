@@ -55,6 +55,7 @@ class Policy:
 
   # Binding
     self.owner = owner
+    self.game = self.owner.game
 
   def update(self, tax_rate, nPublicGood, nPrivateGood, PrivateGood_agent_names = None):
     self.tax_rate = tax_rate
@@ -63,15 +64,64 @@ class Policy:
 
     if PrivateGood_agent_names is not None:
       self.PrivateGood_agent_names = PrivateGood_agent_names
+  
+  def compute_leisure(self):
+    l = 1/(2-self.tax_rate)
+    return l
 
-  def make_sense(self):
-      if self.tax_rate is None or self.nPublicGood is None or self.nPrivateGood is None:
-          return False
-      elif self.tax_rate < 0 or self.tax_rate > 1 or self.nPublicGood < 0 or self.nPrivateGood < 0:
-          return False
-      else:
-          return True
+  def isFeasible(self):
+    r = self.tax_rate
+    x = self.nPublicGood
+    g = self.nPrivateGood
+    N = self.owner.game.nCitizen
+    l = self.compute_leisure()
+    n = len(self.PrivateGood_agent_names)
+
+    if r * N * (1-l) - self.owner.game.PublicGoodPrice * x - n * g >=0:
+      return True
+    else:
+      return False
     
+  def payoff(self, citizen):
+    # Compute the general term
+    r = self.tax_rate
+    x = self.nPublicGood
+    g = self.nPrivateGood
+    l = self.compute_leisure(self)
+    y = (1-r) * (1-l)
+
+    delta = self.game.discounting_factor
+
+    # Check if the policy is Propose by Leader
+    if self.isLeader:
+      factor = 1 if citizen.name in self.PrivateGood_agent_names else 0             # Check if recieve the PrivateGood; indicator factor = 0 or 1
+    else:   # When Proposed by Challenger
+      factor = self.game.W/self.game.nSelectors      # Simplified, in view of the V is Linear
+
+    ####################################################################################################
+      # # Define V based on the factor
+      # def V(x,g,y,l):
+      #   value = math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l)
+      #   return value
+
+      # # Define the continuation value based on the isLeader
+      # def Z(x,g,y,l):
+      #   value = (1/ (1- self.game.discounting_factor)) * V(x,g,y,l)
+      #   return value
+
+      # # Summary
+      # value = V(x,g,y,l) + self.game.discounting_factor * Z(x,g,y,l)
+    ####################################################################################################
+   
+    if self.isFeasible():
+      value = (1/ 1- delta) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+    else:
+      v0 = 0
+      value = v0 + (delta / (1- delta)) * (math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l))
+  
+    return value
+
+
   def show(self):
     # return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.PrivateGood_agent_names
     return (self.tax_rate, self.nPublicGood, self.nPrivateGood)
@@ -101,21 +151,8 @@ class citizen:
       # Game binding
       self.game = game
   
-  def payoff(self,policy):     
-
-    r = policy.tax_rate
-    x = policy.nPublicGood
-    g = policy.nPrivateGood
-
-    if policy.owner.isLeader:
-      factor = 1 if self.name in policy.PrivateGood_agent_names else 0      # factor = 0 or 1, = 0 if citizen in Leader.winning_coalition, =1 if citizen in Leader.winning_coalition
-    else:
-      p = self.game.W/self.game.nSelectors
-      factor = generate_with_probability(p)
-    l = self.compute_leisure(policy)
-    y = (1-r) * (1-l)
-
-    value = math.sqrt(x)+factor*math.sqrt(g)+math.sqrt(y)+math.sqrt(l)
+  def payoff(self,policy):
+    value = policy.payoff(self)
     return value
 
   def compute_leisure(self, policy):
