@@ -135,7 +135,11 @@ class Policy:
 
   def show(self):
     # return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.PrivateGood_agent_names
-    return (self.tax_rate, self.nPublicGood, self.nPrivateGood, self.payoff(self.game.citizens[0]))
+    try:
+      policy_payoff = self.payoff(self.game.citizens[0])
+    except:
+      policy_payoff = self.payoff(self.game.citizens)   # For quick mode
+    return (self.tax_rate, self.nPublicGood, self.nPrivateGood, policy_payoff)
 
   def copy(self):
     return copy.deepcopy()
